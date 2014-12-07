@@ -1,0 +1,12 @@
+MoritzServer Changelog
+======================
+
+Here you can see the full list of changes between each Flask release.
+
+Version 1.0
+-----------
+
+Released on Dec 7th 2014
+
+First public release.
+Contains simple pairing and set command support

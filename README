@@ -1,0 +1,8 @@
+About MoritzServer
+==================
+
+When I bought some thermostats to implement a first step in smart home, there were only the options to either use a proprietary remote-controlled LAN-Gateway called MAX!Cube or use FHEM which is both complex and not simple to setup on a NAS.
+
+So a smaller version around a CUL like FHEM supports was implemented from scratch. Idea is to just do data-keeping and leaving the interface part to some other place. Think of it as a gateway device you control yourself.
+
+Prerequisites are a CUL USB stick and a recent CULFW (1.61 or newer) on it.
