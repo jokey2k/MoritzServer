@@ -259,6 +259,7 @@ class CULMessageThread(threading.Thread):
 
         elif isinstance(msg, AckMessage):
             if msg.receiver_id == CUBE_ID and msg.decoded_payload["state"] == "ok":
+                thermostatstate_received.send(self, msg=msg)
                 with self.thermostat_states_lock:
                     message_logger.info("ack and thermostat state updated for 0x%X" % msg.sender_id)
                     self.thermostat_states[msg.sender_id].update(msg.decoded_payload)
