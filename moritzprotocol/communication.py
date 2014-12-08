@@ -181,8 +181,8 @@ class CULMessageThread(threading.Thread):
             try:
                 received_msg = self.com_receive_queue.get(True, 0.05)
                 message = MoritzMessage.decode_message(received_msg[:-2])
-                signal_strenth = received_msg[-2:]
-                self.respond_to_message(message, signal_strenth)
+                signal_strength = int(received_msg[-2:], base=16)
+                self.respond_to_message(message, signal_strength)
             except Queue.Empty:
                 pass
             except MoritzError as e:
