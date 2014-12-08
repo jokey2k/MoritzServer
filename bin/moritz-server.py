@@ -24,7 +24,7 @@ from flask.ext.sqlalchemy import SQLAlchemy
 # custom imports
 from moritzprotocol.communication import CULMessageThread, CUBE_ID
 from moritzprotocol.messages import SetTemperatureMessage
-from moritzprotocol.signals import device_pair_accepted, device_pair_request
+from moritzprotocol.signals import device_pair_accepted, device_pair_request, thermostatstate_received
 
 # local constantsfrom datetime import datetime
 encoder.FLOAT_REPR = lambda o: format(o, '.2f')
@@ -103,6 +103,23 @@ def activate_thermostat(sender, **kw):
         entry = Thermostat(msg.receiver_id, "Unknown")
     entry.paired = True
     db.session.add(entry)
+    db.session.commit()
+
+@thermostatstate_received.connect
+def store_thermostatstate(sender, **kw):
+    msg = kw['msg']
+    thermostat = Thermostat.query.filter_by(sender_id=msg.sender_id).first()
+    if thermostat is None:
+        return
+    thermostat_state = ThermostatState()
+    thermostat_state.thermostat = thermostat
+    decoded_payload = msg.decoded_payload
+    for parameter in ["last_updated", "rferror", "signal_strength", "desired_temperature",
+                      "is_locked", "valve_position", "lan_gateway", "dstsetting", "mode",
+                      "measured_temperature", "battery_low",]:
+        if parameter in decoded_payload:
+            setattr(thermostat_state, parameter, decoded_payload[parameter])
+    db.session.add(thermostat_state)
     db.session.commit()
 
 #
