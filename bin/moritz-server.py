@@ -69,7 +69,7 @@ class ThermostatState(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     thermostat_id = db.Column(db.Integer, db.ForeignKey('thermostat.id'))
     thermostat = db.relationship('Thermostat', backref=db.backref('states', lazy='dynamic'))
-    last_updated = db.Column('last_updated', db.DateTime, onupdate=datetime.now)
+    last_updated = db.Column('last_updated', db.DateTime, default=datetime.now, onupdate=datetime.now)
     rferror = db.Column(db.Boolean, nullable=True)
     signal_strength = db.Column(db.Integer, nullable=True)
     desired_temperature = db.Column(db.Float, nullable=True)
