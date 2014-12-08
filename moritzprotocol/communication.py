@@ -27,13 +27,13 @@ import logbook
 from serial import Serial
 
 # custom imports
+from moritzprotocol.exceptions import MoritzError
 from moritzprotocol.messages import (
     MoritzMessage, MoritzError,
     PairPingMessage, PairPongMessage,
     TimeInformationMessage,
     SetTemperatureMessage, ThermostatStateMessage, AckMessage
 )
-from moritzprotocol.exceptions import MoritzError
 from moritzprotocol.signals import thermostatstate_received
 
 # local constants
