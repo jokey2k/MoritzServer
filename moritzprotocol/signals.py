@@ -19,5 +19,7 @@ from blinker import signal
 # custom imports
 
 # local constants
+device_pair_request = signal('device_pair_request')
+device_pair_accepted = signal('device_pair_accepted')
 
 thermostatstate_received = signal('thermostatstate_received')

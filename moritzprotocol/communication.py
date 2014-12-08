@@ -34,7 +34,7 @@ from moritzprotocol.messages import (
     TimeInformationMessage,
     SetTemperatureMessage, ThermostatStateMessage, AckMessage
 )
-from moritzprotocol.signals import thermostatstate_received
+from moritzprotocol.signals import thermostatstate_received, device_pair_accepted, device_pair_request
 
 # local constants
 com_logger = logbook.Logger("CUL Serial")
@@ -209,6 +209,7 @@ class CULMessageThread(threading.Thread):
         if isinstance(msg, PairPingMessage):
             message_logger.info("received PairPing")
             # Some peer wants to pair. Let's see...
+            device_pair_request.send(self, msg=msg)
             if msg.receiver_id == 0x0:
                 # pairing after factory reset
                 if not (self.pair_as_cube or self.pair_as_wallthermostat or self.pair_as_ShutterContact):
@@ -221,6 +222,7 @@ class CULMessageThread(threading.Thread):
                 resp_msg.group_id = msg.group_id
                 message_logger.info("responding to pair after factory reset")
                 self.command_queue.put((resp_msg, {"devicetype": "Cube"}))
+                device_pair_accepted.send(self, resp_msg=resp_msg)
             elif msg.receiver_id == CUBE_ID:
                 # pairing after battery replacement
                 resp_msg = PairPongMessage()
@@ -230,6 +232,7 @@ class CULMessageThread(threading.Thread):
                 resp_msg.group_id = msg.group_id
                 message_logger.info("responding to pair after battery replacement")
                 self.command_queue.put((resp_msg, {"devicetype": "Cube"}))
+                device_pair_accepted.send(self, resp_msg=resp_msg)
             else:
                 # pair to someone else after battery replacement, don't care
                 message_logger.info("pair after battery replacement sent to other device 0x%X, ignoring" % msg.receiver_id)
@@ -252,7 +255,7 @@ class CULMessageThread(threading.Thread):
                 self.thermostat_states[msg.sender_id].update(msg.decoded_payload)
                 self.thermostat_states[msg.sender_id]['last_updated'] = datetime.now()
                 self.thermostat_states[msg.sender_id]['signal_strenth'] = signal_strenth
-            thermostatstate_received.send(msg)
+            thermostatstate_received.send(self, msg=msg)
 
         elif isinstance(msg, AckMessage):
             if msg.receiver_id == CUBE_ID and msg.decoded_payload["state"] == "ok":
