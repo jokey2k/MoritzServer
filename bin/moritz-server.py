@@ -95,7 +95,7 @@ def main(args):
         return """<html>Done. <a href="/">back</a>"""
 
     if args.flask_debug:
-        app.run(host="0.0.0.0", port=12345, debug=True)
+        app.run(host="0.0.0.0", port=12345, debug=True, use_reloader=False)
     else:
         app.run(host="0.0.0.0", port=12345)
 
