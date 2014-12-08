@@ -19,6 +19,7 @@ from json import encoder
 
 # environment imports
 from flask import Flask, request
+from flask.ext.sqlalchemy import SQLAlchemy
 
 # custom imports
 from moritzprotocol.communication import CULMessageThread, CUBE_ID
@@ -41,13 +42,15 @@ class JSONWithDateEncoder(json.JSONEncoder):
         # Let the base class default method raise the TypeError
         return json.JSONEncoder.default(self, obj)
 
+app = Flask(__name__)
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/moritz-server.db'
+db = SQLAlchemy(app)
 
 def main(args):
     command_queue = Queue.Queue()
     message_thread = CULMessageThread(command_queue, args.cul_path)
     message_thread.start()
 
-    app = Flask(__name__)
 
     @app.route("/")
     def index():
@@ -63,6 +66,43 @@ def main(args):
             content += """</select><select name="mode"><option>auto</option><option selected>manual</option><option>boost</option></select>"""
             content += """<input type=text name=temperature><input type=submit value="set"></form></html>"""
             return content
+#
+# Models
+#
+class Thermostat(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    sender_id = db.Column(db.Integer)
+    serial = db.Column(db.String(32))
+    firmware_version = db.Column(db.String(32), nullable=True)
+    name = db.Column(db.String(64))
+    paired = db.Column(db.Boolean, default=False)
+
+    def __init__(self, sender_id, serial):
+        self.sender_id = sender_id
+        self.serial = serial
+        self.name = serial
+
+    def __repr__(self):
+        return "<%s sender_id=%s name=%s>" % (self.__class__.__name__, self.sender_id, self.name)
+
+
+class ThermostatState(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    thermostat_id = db.Column(db.Integer, db.ForeignKey('thermostat.id'))
+    thermostat = db.relationship('Thermostat', backref=db.backref('states', lazy='dynamic'))
+    last_updated = db.Column('last_updated', db.DateTime, onupdate=datetime.now)
+    rferror = db.Column(db.Boolean, nullable=True)
+    signal_strength = db.Column(db.Integer, nullable=True)
+    desired_temperature = db.Column(db.Float, nullable=True)
+    is_locked = db.Column(db.Boolean, nullable=True)
+    valve_position = db.Column(db.Integer, nullable=True)
+    lan_gateway = db.Column(db.Boolean, nullable=True)
+    dstsetting = db.Column(db.Boolean, nullable=True)
+    mode = db.Column(db.Integer, nullable=True)
+    measured_temperature = db.Column(db.Float, nullable=True)
+    battery_low = db.Column(db.Boolean, nullable=True)
+
+
         msg = SetTemperatureMessage()
         msg.counter = 0xB9
         msg.sender_id = CUBE_ID
@@ -108,6 +148,8 @@ if __name__ == '__main__':
     parser.add_argument("--detach", action="store_true", help="Detach from terminal")
     parser.add_argument("--cul-path", default="/dev/ttyACM0", help="Path to usbmodem path of CUL, defaults to /dev/ttyACM0")
     args = parser.parse_args()
+
+    db.create_all()
 
     if args.detach:
         import detach
