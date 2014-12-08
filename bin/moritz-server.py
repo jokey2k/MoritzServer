@@ -93,13 +93,17 @@ def main(args):
             command_queue.put((msg, payload))
         return """<html>Done. <a href="/">back</a>"""
 
-    app.run(host="0.0.0.0", port=12345)
+    if args.flask_debug:
+        app.run(host="0.0.0.0", port=12345, debug=True)
+    else:
+        app.run(host="0.0.0.0", port=12345)
 
     message_thread.join()
 
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument("--flask-debug", action="store_true", help="Enables Flask debug and reload. May cause weird behaviour.")
     parser.add_argument("--detach", action="store_true", help="Detach from terminal")
     parser.add_argument("--cul-path", default="/dev/ttyACM0", help="Path to usbmodem path of CUL, defaults to /dev/ttyACM0")
     args = parser.parse_args()
