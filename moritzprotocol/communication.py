@@ -34,6 +34,7 @@ from moritzprotocol.messages import (
     SetTemperatureMessage, ThermostatStateMessage, AckMessage
 )
 from moritzprotocol.exceptions import MoritzError
+from moritzprotocol.signals import thermostatstate_received
 
 # local constants
 com_logger = logbook.Logger("COM")
@@ -251,6 +252,7 @@ class CULMessageThread(threading.Thread):
                 self.thermostat_states[msg.sender_id].update(msg.decoded_payload)
                 self.thermostat_states[msg.sender_id]['last_updated'] = datetime.now()
                 self.thermostat_states[msg.sender_id]['signal_strenth'] = signal_strenth
+            thermostatstate_received.send(msg)
 
         elif isinstance(msg, AckMessage):
             if msg.receiver_id == CUBE_ID and msg.decoded_payload["state"] == "ok":
