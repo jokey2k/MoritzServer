@@ -3,3 +3,4 @@ detach
 flask
 logbook
 pyserial
+sqlalchemy
