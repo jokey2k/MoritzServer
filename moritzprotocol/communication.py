@@ -37,8 +37,8 @@ from moritzprotocol.messages import (
 from moritzprotocol.signals import thermostatstate_received
 
 # local constants
-com_logger = logbook.Logger("COM")
-message_logger = logbook.Logger("MESSAGE")
+com_logger = logbook.Logger("CUL Serial")
+message_logger = logbook.Logger("CUL Messaging")
 
 # Hardcodings based on FHEM recommendations
 CUBE_ID = 0x123456
@@ -140,7 +140,7 @@ class CULComThread(threading.Thread):
         if command.startswith("Zs"):
             self._has_send_budget = False
         self.com_port.write(command + "\r\n")
-        com_logger.debug("sending: %s" % command)
+        com_logger.debug("sent: %s" % command)
 
     def _read_result(self):
         """Reads data from port, if it's a Moritz message, forward directly, otherwise return to caller"""
