@@ -125,8 +125,8 @@ def store_thermostatstate(sender, **kw):
 #
 # Views
 #
-@app.route("/")
-def index():
+@app.route("/current_thermostat_states")
+def current_thermostat_states():
     with message_thread.thermostat_states_lock:
         return json.dumps(message_thread.thermostat_states, cls=JSONWithDateEncoder)
 
