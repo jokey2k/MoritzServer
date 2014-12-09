@@ -130,6 +130,19 @@ def current_thermostat_states():
     with message_thread.thermostat_states_lock:
         return json.dumps(message_thread.thermostat_states, cls=JSONWithDateEncoder)
 
+@app.route("/get_devices")
+def get_devices():
+    devices = []
+    for thermostat in Thermostat.query.all():
+        devices.append(
+            'sender_id': thermostat.sender_id,
+            'serial': thermostat.serial,
+            'firmware_version': thermostat.firmware_version,
+            'name': thermostat.name,
+            'paired': thermostat.paired,
+        )
+    return json.dumps(devices)
+
 @app.route("/set_temp", methods=["GET", "POST"])
 def set_temp():
     if not request.form:
