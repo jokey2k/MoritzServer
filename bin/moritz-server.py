@@ -209,11 +209,22 @@ if __name__ == '__main__':
     db.create_all()
 
     if args.detach:
+
+        # init logger
+        from logbook import FileHandler
+        log_handler = FileHandler('server.log')
+        log_handler.push_application()
+
         import detach
         with detach.Detach(daemonize=True) as d:
             if d.pid:
-                print("started process {} in background".format(d.pid))
+                print("started process {} in background with log to server.log".format(d.pid))
             else:
                 main(args)
     else:
+        # init logger
+        from logbook.more import ColorizedStderrHandler
+        log_handler = ColorizedStderrHandler()
+        log_handler.push_application()
+
         main(args)
