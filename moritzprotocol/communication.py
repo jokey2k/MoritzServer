@@ -45,7 +45,6 @@ CUBE_ID = 0x123456
 WALLTHERMO_ID = 0x123457
 SHUTTERCONTACT_ID = 0x123458
 
-
 class CULComThread(threading.Thread):
     """Low-level serial communication thread base"""
 
@@ -57,33 +56,56 @@ class CULComThread(threading.Thread):
         self.pending_line = []
         self.stop_requested = threading.Event()
         self.cul_version = ""
-        self._has_send_budget = False
+        self._pending_budget = 0
+        self._pending_message = None
 
     def run(self):
         self._init_cul()
         while not self.stop_requested.isSet():
+            # Send budget request if we don't know it
+            if self._pending_budget == 0:
+                self.send_command("X")
+                for i in range(10):
+                    read_line = self._read_result()
+                    if read_line is not None:
+                        if read_line.startswith("21  "):
+                            self._pending_budget = int(read_line[3:].strip()) * 10 or 1
+                            com_logger.info("Got pending budget message: %sms" % self._pending_budget)
+                        else:
+                            com_logger.info("Got unhandled response from CUL: '%s'" % read_line)
+                    if self._pending_budget > 0:
+                        com_logger.debug("Finished fetching budget, having %sms now" % self._pending_budget)
+                        break
+                    time.sleep(0.05)
+
             # Process pending received messages (if any)
             read_line = self._read_result()
             if read_line is not None:
-                com_logger.info("Got unhandled response from CUL: '%s'" % read_line)
+                if read_line.startswith("21  "):
+                    self._pending_budget = int(read_line[3:].strip()) * 10 or 1
+                    com_logger.info("Got pending budget: %sms" % self._pending_budget)
+                else:
+                    com_logger.info("Got unhandled response from CUL: '%s'" % read_line)
+
+            if self._pending_message is None and not self.send_queue.empty():
+                com_logger.debug("Fetching message from queue")
+                self._pending_message = self.send_queue.get(True, 0.05)
+                if self._pending_message is None:
+                    com_logger.debug("Failed fetching message due to thread lock, deferring")
 
             # send queued messages yet respecting send budget of 1%
-            if not self.send_queue.empty() and self.has_send_budget:
-                com_logger.debug("Processing queued outgoing message(s)")
-                while not self.send_queue.empty():
-                    com_logger.debug("Checking available budget (if not already done)")
-                    if not self.has_send_budget:
-                        break
-                    com_logger.debug("Fetching message from queue")
-                    out_msg = self.send_queue.get(True, 0.05)
-                    if out_msg is None:
-                        com_logger.debug("Failed fetching message due to thread lock, deferring")
-                        break
-                    com_logger.debug("Queueing command %s" % out_msg)
-                    self.send_command(out_msg)
+            if self._pending_message:
+                com_logger.debug("Checking quota for outgoing message")
+                if self._pending_budget > len(self._pending_message)*10:
+                    com_logger.debug("Queueing pre-fetched command %s" % self._pending_message)
+                    self.send_command(self._pending_message)
+                    self._pending_message = None
+                else:
+                    self._pending_budget = 0
+                    com_logger.debug("Not enough quota, re-check enforced")
 
-            # give the system 250ms to do something else, we're embedded....
-            time.sleep(0.25)
+            # give the system 200ms to do something else, we're embedded....
+            time.sleep(0.2)
 
     def join(self, timeout=None):
         self.stop_requested.set()
@@ -95,9 +117,31 @@ class CULComThread(threading.Thread):
         self.com_port = Serial(self.device_path)
         self._read_result()
         # get CUL FW version
-        self.send_command("V")
-        time.sleep(0.3)
-        self.cul_version = self._read_result() or ""
+        def _get_cul_ver():
+            self.send_command("V")
+            time.sleep(0.3)
+            self.cul_version = self._read_result() or ""
+        for i in range(10):
+            _get_cul_ver()
+            if self.cul_version:
+                com_logger.info("CUL reported version %s" % self.cul_version)
+                break
+            else:
+                com_logger.info("No version from CUL reported?")
+        if not self.cul_version:
+            com_logger.info("No version from CUL reported. Closing and re-opening port")
+            self.com_port.close()
+            self.com_port = Serial(self.device_path)
+            for i in range(10):
+                _get_cul_ver()
+                if self.cul_version:
+                    com_logger.info("CUL reported version %s" % self.cul_version)
+                else:
+                    com_logger.info("No version from CUL reported?")
+            com_logger.error("No version from CUL, cannot communicate")
+            self.stop_requested.set()
+            return
+
         # enable reporting of message strength
         self.send_command("X21")
         time.sleep(0.3)
@@ -113,32 +157,13 @@ class CULComThread(threading.Thread):
     def has_send_budget(self):
         """Ask CUL if we have enough budget of the 1 percent rule left"""
 
-        if self._has_send_budget:
-            return self._has_send_budget
-        self.send_command("X")
-        for i in range(0,10):
-            result = self._read_result()
-            if result is None:
-                time.sleep(0.2)
-                continue
-            if result[0:2] != "21":
-                # we set X21 in the beginning and this should be our response now
-                com_logger.debug("Received unrelated message for budget question: '%s'" % result)
-                continue
-            remaining_ms = int(result[3:].strip()) * 10
-            if remaining_ms > 2000:
-                self._has_send_budget = True
-                com_logger.debug("Enough send budget: %s ms" % remaining_ms)
-            else:
-                com_logger.info("Currently no send budget. Only %s ms available and we need at least 2000 ms")
-                break
-        return self._has_send_budget
+        return self._pending_budget >= 2000
 
     def send_command(self, command):
         """Sends given command to CUL. Invalidates has_send_budget if command starts with Zs"""
 
         if command.startswith("Zs"):
-            self._has_send_budget = False
+            self._pending_budget = 0
         self.com_port.write(command + "\r\n")
         com_logger.debug("sent: %s" % command)
 
@@ -220,9 +245,12 @@ class CULMessageThread(threading.Thread):
                 resp_msg.sender_id = CUBE_ID
                 resp_msg.receiver_id = msg.sender_id
                 resp_msg.group_id = msg.group_id
-                message_logger.info("responding to pair after factory reset")
-                self.command_queue.put((resp_msg, {"devicetype": "Cube"}))
-                device_pair_accepted.send(self, resp_msg=resp_msg)
+                if self.com_thread.has_send_budget:
+                    message_logger.info("responding to pair after factory reset")
+                    self.command_queue.put((resp_msg, {"devicetype": "Cube"}))
+                    device_pair_accepted.send(self, resp_msg=resp_msg)
+                else:
+                    message_logger.info("NOT responding to pair after factory reset as no send budget to be on time")
             elif msg.receiver_id == CUBE_ID:
                 # pairing after battery replacement
                 resp_msg = PairPongMessage()
@@ -230,9 +258,12 @@ class CULMessageThread(threading.Thread):
                 resp_msg.sender_id = CUBE_ID
                 resp_msg.receiver_id = msg.sender_id
                 resp_msg.group_id = msg.group_id
-                message_logger.info("responding to pair after battery replacement")
-                self.command_queue.put((resp_msg, {"devicetype": "Cube"}))
-                device_pair_accepted.send(self, resp_msg=resp_msg)
+                if self.com_thread.has_send_budget:
+                    message_logger.info("responding to pair after battery replacement")
+                    self.command_queue.put((resp_msg, {"devicetype": "Cube"}))
+                    device_pair_accepted.send(self, resp_msg=resp_msg)
+                else:
+                    message_logger.info("NOT responding to pair after battery replacement as no send budget to be on time")
             else:
                 # pair to someone else after battery replacement, don't care
                 message_logger.info("pair after battery replacement sent to other device 0x%X, ignoring" % msg.receiver_id)
