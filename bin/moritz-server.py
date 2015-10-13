@@ -40,7 +40,7 @@ class JSONWithDateEncoder(json.JSONEncoder):
         return json.JSONEncoder.default(self, obj)
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:////tmp/moritz-server.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///moritz-server.db'
 db = SQLAlchemy(app)
 
 command_queue = Queue.Queue()
