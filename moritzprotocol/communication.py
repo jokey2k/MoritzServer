@@ -251,6 +251,7 @@ class CULMessageThread(threading.Thread):
                     device_pair_accepted.send(self, resp_msg=resp_msg)
                 else:
                     message_logger.info("NOT responding to pair after factory reset as no send budget to be on time")
+                return
             elif msg.receiver_id == CUBE_ID:
                 # pairing after battery replacement
                 resp_msg = PairPongMessage()
@@ -264,6 +265,7 @@ class CULMessageThread(threading.Thread):
                     device_pair_accepted.send(self, resp_msg=resp_msg)
                 else:
                     message_logger.info("NOT responding to pair after battery replacement as no send budget to be on time")
+                return
             else:
                 # pair to someone else after battery replacement, don't care
                 message_logger.info("pair after battery replacement sent to other device 0x%X, ignoring" % msg.receiver_id)
@@ -279,6 +281,7 @@ class CULMessageThread(threading.Thread):
                 resp_msg.group_id = msg.group_id
                 message_logger.info("time information requested by 0x%X, responding" % msg.sender_id)
                 self.command_queue.put((resp_msg, datetime.now()))
+                return
 
         elif isinstance(msg, ThermostatStateMessage):
             with self.thermostat_states_lock:
@@ -287,6 +290,7 @@ class CULMessageThread(threading.Thread):
                 self.thermostat_states[msg.sender_id]['last_updated'] = datetime.now()
                 self.thermostat_states[msg.sender_id]['signal_strenth'] = signal_strenth
             thermostatstate_received.send(self, msg=msg)
+            return
 
         elif isinstance(msg, AckMessage):
             if msg.receiver_id == CUBE_ID and msg.decoded_payload["state"] == "ok":
@@ -296,3 +300,7 @@ class CULMessageThread(threading.Thread):
                     self.thermostat_states[msg.sender_id].update(msg.decoded_payload)
                     self.thermostat_states[msg.sender_id]['last_updated'] = datetime.now()
                     self.thermostat_states[msg.sender_id]['signal_strenth'] = signal_strenth
+                return
+
+        message_logger.warning("Unhandled Message of type %s, contains %s" % (msg.__class__.__name__, str(msg)))
+
