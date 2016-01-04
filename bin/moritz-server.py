@@ -18,7 +18,7 @@ import json
 from json import encoder
 
 # environment imports
-from flask import Flask, request
+from flask import Flask, request, url_for
 from flask.ext.sqlalchemy import SQLAlchemy
 
 # custom imports
@@ -125,10 +125,17 @@ def store_thermostatstate(sender, **kw):
 #
 # Views
 #
+@app.route("/")
+def index():
+    return "<a href='" + url_for("get_devices") + "'>Tracked devices</a><br>" + \
+           "<a href='" + url_for("current_thermostat_states") + "'>Current states</a><br>" + \
+           "<a href='" + url_for("set_temp") + "'>Set one temp</a><br>" + \
+           "<a href='" + url_for("set_temp_all") + "'>Set temp on all sensors</a>"
+
 @app.route("/current_thermostat_states")
 def current_thermostat_states():
     with message_thread.thermostat_states_lock:
-        return json.dumps(message_thread.thermostat_states, cls=JSONWithDateEncoder)
+        return json.dumps(message_thread.thermostat_states, indent=4, sort_keys=True, cls=JSONWithDateEncoder)
 
 @app.route("/get_devices")
 def get_devices():
